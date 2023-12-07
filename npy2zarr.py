@@ -41,7 +41,7 @@ def main(datasource='logged_plans_03'):
         if '.txt' in file:
             continue
         plan = np.load(os.path.join(data_folder, file))
-        plan = np.concatenate([plan[0::10], plan[[-1]]], axis=0) # select every 10th step, making sure the last step is included
+        # plan = np.concatenate([plan[0::10], plan[[-1]]], axis=0) # select every 10th step, making sure the last step is included
         next_plan = np.concatenate([plan[1:], plan[[-1]]], axis=0)
         
         action = np.concatenate([next_plan[:, pos_dims_before['ee_pos']], next_plan[:, pos_dims_before['gripper']]], axis=1) # end effector position and gripper state
@@ -55,7 +55,7 @@ def main(datasource='logged_plans_03'):
         episode_end += len(plan)
         episode_ends.append(episode_end) 
 
-    data_root = zarr.open_group('data/logged_plans_03.zarr', mode='w')
+    data_root = zarr.open_group('data/' + datasource + '.zarr', mode='w')
     data = data_root.create_group('data')
     data.create_dataset('action', data=np.concatenate(action_list, axis=0), dtype='float32')
     data.create_dataset('state', data=np.concatenate(state_list, axis=0), dtype='float32')
