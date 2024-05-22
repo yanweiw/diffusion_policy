@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - task: curobo_lowdim #pusht_lowdim
+  - task: pusht_lowdim #curobo_lowdim #pusht_lowdim
 
 name: train_diffusion_unet_lowdim
 _target_: diffusion_policy.workspace.train_diffusion_unet_lowdim_workspace.TrainDiffusionUnetLowdimWorkspace
