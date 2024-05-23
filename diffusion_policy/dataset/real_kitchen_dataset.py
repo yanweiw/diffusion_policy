@@ -63,7 +63,7 @@ class RealKitchenDataset(BaseImageDataset):
     def get_normalizer(self, mode='limits', **kwargs):
         data = {
             'action': self.replay_buffer['action'],
-            'state': self.replay_buffer['state']#[...,:2]
+            'eef_pose': self.replay_buffer['state']
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -74,15 +74,15 @@ class RealKitchenDataset(BaseImageDataset):
         return len(self.sampler)
 
     def _sample_to_data(self, sample):
-        agent_pos = sample['state'][:,:2].astype(np.float32) # (agent_posx2, block_posex3)
+        eff_pose = sample['state'].astype(np.float32)
         image = np.moveaxis(sample['img'],-1,1)/255
 
         data = {
             'obs': {
-                'img': image, # T, 3, 96, 96
-                'state': agent_pos, # T, 2
+                'image': image, # T, 3, 480, 640
+                'eef_pose': eff_pose, # T, 9
             },
-            'action': sample['action'].astype(np.float32) # T, 2
+            'action': sample['action'].astype(np.float32) # T, 9
         }
         return data
     
