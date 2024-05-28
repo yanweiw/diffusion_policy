@@ -35,6 +35,7 @@ def main(datasource):
         assert action.shape[0] == len(wristrgb), f"action shape: {action.shape}, wristrgb shape: {wristrgb.shape}"
         img = []
         for rgb in wristrgb:
+            rgb = cv2.resize(rgb, (320, 240))
             img.append(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)) 
         img = np.stack(img)
         print('obs shape: ', img.shape)

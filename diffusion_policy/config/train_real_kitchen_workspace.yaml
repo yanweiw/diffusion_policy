@@ -74,15 +74,15 @@ ema:
   max_value: 0.9999
 
 dataloader:
-  batch_size: 16
-  num_workers: 4
+  batch_size: 64
+  num_workers: 2
   shuffle: True
   pin_memory: True
   persistent_workers: False
 
 val_dataloader:
-  batch_size: 16
-  num_workers: 4
+  batch_size: 64
+  num_workers: 2
   shuffle: False
   pin_memory: True
   persistent_workers: False
@@ -139,14 +139,14 @@ checkpoint:
   save_last_snapshot: False
 
 multi_run:
-  run_dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  run_dir: /mnt/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
   wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
 
 hydra:
   job:
     override_dirname: ${name}
   run:
-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    dir: /mnt/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
   sweep:
-    dir: data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    dir: /mnt/data/outputs/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
     subdir: ${hydra.job.num}
