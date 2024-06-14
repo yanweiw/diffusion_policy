@@ -80,9 +80,9 @@ class RealKitchenDataset(BaseImageDataset):
         data = {
             'obs': {
                 'image': image, # T, 3, 480, 640
-                'eef_pose': eff_pose, # T, 9
+                'eef_pose': eff_pose, # T, 8
             },
-            'action': sample['action'].astype(np.float32) # T, 9
+            'action': sample['action'].astype(np.float32) # T, 8
         }
         return data
     

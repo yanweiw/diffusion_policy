@@ -8,20 +8,20 @@ shape_meta: &shape_meta
       shape: *image_shape
       type: rgb
     eef_pose:
-      shape: [9] # 3 for position, 4 for quaternion, 2 for gripper
+      shape: [8] # 3 for position, 4 for quaternion, 1 for gripper
       type: low_dim
   action:
-    shape: [9] # action are 1 shifted from robot_eef_pose
+    shape: [8] # action are 1 shifted from robot_eef_pose
 
 env_runner:
   _target_: diffusion_policy.env_runner.real_pusht_image_runner.RealPushTImageRunner # just a placeholder
 
 dataset:
   _target_: diffusion_policy.dataset.real_kitchen_dataset.RealKitchenDataset
-  zarr_path: data/kitchen/single_bowl.zarr
+  zarr_path: data/kitchen/bowl_4.zarr
   horizon: ${horizon}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42
-  val_ratio: 0.02
+  val_ratio: 0.1 #0.02
   max_train_episodes: 90
