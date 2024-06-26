@@ -27,6 +27,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
             kernel_size=5,
             n_groups=8,
             cond_predict_scale=True,
+            past_action_visible=False,
             # parameters passed to step
             **kwargs):
         super().__init__()
@@ -65,7 +66,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
             obs_dim=0 if obs_as_global_cond else obs_feature_dim,
             max_n_obs_steps=n_obs_steps,
             fix_obs_steps=True,
-            action_visible=False
+            action_visible=past_action_visible # allow past action conditioning
         )
         self.normalizer = LinearNormalizer()
         self.horizon = horizon
@@ -74,11 +75,13 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         self.n_action_steps = n_action_steps
         self.n_obs_steps = n_obs_steps
         self.obs_as_global_cond = obs_as_global_cond
+        self.past_action_visible = past_action_visible
         self.kwargs = kwargs
 
         if num_inference_steps is None:
             num_inference_steps = noise_scheduler.config.num_train_timesteps
         self.num_inference_steps = num_inference_steps
+
     
     # ========= inference  ============
     def conditional_sample(self, 
@@ -152,6 +155,9 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
             # empty data for action
             cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
             cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
+            if self.past_action_visible:
+                cond_data[:,:To-1,:] = this_nobs['eef_pose'].unsqueeze(0).expand(B, To, Da)[:,1:,:]
+                cond_mask[:,:To-1,:] = True
         else:
             # condition through impainting
             this_nobs = dict_apply(nobs, lambda x: x[:,:To,...].reshape(-1,*x.shape[2:]))
