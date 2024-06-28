@@ -45,7 +45,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         global_cond_dim = None
         if obs_as_global_cond:
             input_dim = action_dim
-            global_cond_dim = obs_feature_dim * n_obs_steps
+            global_cond_dim = obs_feature_dim #* n_obs_steps
 
         model = ConditionalUnet1D(
             input_dim=input_dim,
@@ -147,16 +147,19 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         local_cond = None
         global_cond = None
         if self.obs_as_global_cond:
-            # condition through global feature
-            this_nobs = dict_apply(nobs, lambda x: x[:,:To,...].reshape(-1,*x.shape[2:]))
-            nobs_features = self.obs_encoder(this_nobs)
-            # reshape back to B, Do
-            global_cond = nobs_features.reshape(B, -1)
+            # # condition through global feature
+            # this_nobs = dict_apply(nobs, lambda x: x[:,:To,...].reshape(-1,*x.shape[2:]))
+            # nobs_features = self.obs_encoder(this_nobs)
+            # # reshape back to B, Do
+            # global_cond = nobs_features.reshape(B, -1)
+            this_nobs = dict_apply(nobs, lambda x: x[:,:self.n_obs_steps,...]) # do not reshape B, T, ... to B*T
+            global_cond = self.obs_encoder(this_nobs)
+
             # empty data for action
             cond_data = torch.zeros(size=(B, T, Da), device=device, dtype=dtype)
             cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
             if self.past_action_visible:
-                cond_data[:,:To-1,:] = this_nobs['eef_pose'].unsqueeze(0).expand(B, To, Da)[:,1:,:]
+                cond_data[:,:To-1,:] = this_nobs['pose_ee'][:,1:,:]
                 cond_mask[:,:To-1,:] = True
         else:
             # condition through impainting
@@ -210,13 +213,15 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         trajectory = nactions
         cond_data = trajectory
         if self.obs_as_global_cond:
-            # reshape B, T, ... to B*T
-            this_nobs = dict_apply(nobs, 
-                lambda x: x[:,:self.n_obs_steps,...].reshape(-1,*x.shape[2:]))
-            nobs_features = self.obs_encoder(this_nobs)
-            # reshape back to B, Do
-            global_cond = nobs_features.reshape(batch_size, -1)
-        else:
+            # # reshape B, T, ... to B*T
+            # this_nobs = dict_apply(nobs, 
+            #     lambda x: x[:,:self.n_obs_steps,...].reshape(-1,*x.shape[2:]))
+            # nobs_features = self.obs_encoder(this_nobs)
+            # # reshape back to B, Do
+            # global_cond = nobs_features.reshape(batch_size, -1)
+            this_nobs = dict_apply(nobs, lambda x: x[:,:self.n_obs_steps,...]) # do not reshape B, T, ... to B*T
+            global_cond = self.obs_encoder(this_nobs)
+        else: # this may not work with different T dimension for img and lowdim obs
             # reshape B, T, ... to B*T
             this_nobs = dict_apply(nobs, lambda x: x.reshape(-1, *x.shape[2:]))
             nobs_features = self.obs_encoder(this_nobs)

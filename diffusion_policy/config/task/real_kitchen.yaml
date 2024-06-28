@@ -2,12 +2,17 @@ name: real_kitchen
 
 image_shape: &image_shape [3, 240, 320]
 shape_meta: &shape_meta
+  n_obs_steps: ${n_obs_steps}
+  n_img_skips: ${n_img_skips}
   # acceptable types: rgb, low_dim
   obs:
-    image:
+    wrist:
       shape: *image_shape
       type: rgb
-    eef_pose:
+    scene:
+      shape: *image_shape
+      type: rgb
+    pose_ee:
       shape: [8] # 3 for position, 4 for quaternion, 1 for gripper
       type: low_dim
   action:
@@ -18,8 +23,10 @@ env_runner:
 
 dataset:
   _target_: diffusion_policy.dataset.real_kitchen_dataset.RealKitchenDataset
-  zarr_path: data/kitchen/bowl_4.zarr
+  zarr_path: data/kitchen/tmp01.zarr
   horizon: ${horizon}
+  dataset_obs_steps: ${n_obs_steps}
+  n_img_skips: ${n_img_skips}
   pad_before: ${eval:'${n_obs_steps}-1'}
   pad_after: ${eval:'${n_action_steps}-1'}
   seed: 42

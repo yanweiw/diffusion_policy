@@ -17,32 +17,41 @@ def main(datasource):
     episode_ends = []
     state_list = []
     action_list = []
-    img_list = []
+    wristrgb_list = []
+    scenergb_list = []
 
     for file in tqdm(data_files):
         filepath = os.path.join(data_folder, file)
         print('loading file: ', filepath)
         with open(filepath, 'rb') as handle:
                 (xyz, quat, ee, jointpos, scenergb, wristrgb, scenedep, wristdep) = pickle.load(handle)
-        # plan = np.concatenate([plan[0::10], plan[[-1]]], axis=0) # select every 10th step, making sure the last step is included
-        state = np.concatenate([xyz, quat, ee], axis=1) # end effector position and gripper state
+        
+        # end effector position and gripper state
+        state = np.concatenate([xyz, quat, ee], axis=1) 
         print('state shape: ', state.shape)
-        next_xyz = np.concatenate([xyz[1:], xyz[[-1]]], axis=0)
-        next_quat = np.concatenate([quat[1:], quat[[-1]]], axis=0)
-        next_ee = np.concatenate([ee[1:], ee[[-1]]], axis=0)
-        action = np.concatenate([next_xyz, next_quat, next_ee], axis=1) # end effector position and gripper state
+        action = np.concatenate([state[1:], state[[-1]]], axis=0)
         print('action shape: ', action.shape)
+        
         assert action.shape[0] == len(wristrgb), f"action shape: {action.shape}, wristrgb shape: {wristrgb.shape}"
-        img = []
+        assert action.shape[0] == len(scenergb), f"action shape: {action.shape}, scenergb shape: {scenergb.shape}"
+        wrist = []
         for rgb in wristrgb:
             rgb = cv2.resize(rgb, (320, 240))
-            img.append(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)) 
-        img = np.stack(img)
-        print('obs shape: ', img.shape)
+            wrist.append(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)) 
+        wrist = np.stack(wrist)
+        print('obs shape: ', wrist.shape)
+
+        scene = []
+        for rgb in scenergb:
+            rgb = cv2.resize(rgb, (320, 240))
+            scene.append(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
+        scene = np.stack(scene)
+        print('scene shape: ', scene.shape)
         
         state_list.append(state)
         action_list.append(action)
-        img_list.append(img)
+        wristrgb_list.append(wrist)
+        scenergb_list.append(scene)
         episode_end += len(action)
         episode_ends.append(episode_end) 
 
@@ -51,7 +60,8 @@ def main(datasource):
     data = data_root.create_group('data')
     data.create_dataset('state', data=np.concatenate(state_list, axis=0), dtype='float32')
     data.create_dataset('action', data=np.concatenate(action_list, axis=0), dtype='float32')
-    data.create_dataset('img', data=np.concatenate(img_list, axis=0), dtype='uint8')
+    data.create_dataset('wrist', data=np.concatenate(wristrgb_list, axis=0), dtype='uint8')
+    data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
     meta = data_root.create_group('meta')
     meta.create_dataset('episode_ends', data=np.array(episode_ends))
     print('data saved to: ', os.path.abspath(save_path))

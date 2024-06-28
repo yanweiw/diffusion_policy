@@ -20,7 +20,7 @@ class MultiImageObsEncoder(ModuleAttrMixin):
             # use single rgb model for all rgb inputs
             share_rgb_model: bool=False,
             # renormalize rgb input with imagenet normalization
-            # assuming input in [0,1]
+            # assuming input in [-1,1] after normalizer normalization
             imagenet_norm: bool=False
         ):
         """
@@ -67,6 +67,17 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                                 num_groups=x.num_features//16, 
                                 num_channels=x.num_features)
                         )
+                    # change conv1 to accept stacked images
+                    n_obs_steps = shape_meta['n_obs_steps']
+                    n_img_skips = shape_meta['n_img_skips']
+                    this_model.conv1 = nn.Conv2d(
+                        in_channels=shape[0]*n_obs_steps//n_img_skips,
+                        out_channels=64,
+                        kernel_size=(7, 7),
+                        stride=(2, 2),
+                        padding=(3, 3),
+                        bias=False
+                    )
                     key_model_map[key] = this_model
                 
                 # configure resize
@@ -80,7 +91,7 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                     this_resizer = torchvision.transforms.Resize(
                         size=(h,w)
                     )
-                    input_shape = (shape[0],h,w)
+                    input_shape = (shape[0]*n_obs_steps//n_img_skips,h,w)
 
                 # configure randomizer
                 this_randomizer = nn.Identity()
@@ -159,7 +170,8 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                     batch_size = img.shape[0]
                 else:
                     assert batch_size == img.shape[0]
-                assert img.shape[1:] == self.key_shape_map[key]
+                assert img.shape[2:] == self.key_shape_map[key]
+                img = img.reshape(batch_size, -1, *img.shape[3:]) # reshape from (B,T,C,H,W) to (B,T*C,H,W)
                 img = self.key_transform_map[key](img)
                 feature = self.key_model_map[key](img)
                 features.append(feature)
@@ -171,7 +183,8 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                 batch_size = data.shape[0]
             else:
                 assert batch_size == data.shape[0]
-            assert data.shape[1:] == self.key_shape_map[key]
+            assert data.shape[2:] == self.key_shape_map[key]
+            data = data.reshape(batch_size, -1) # reshape from (B,T,D) to (B,T*D)
             features.append(data)
         
         # concatenate all features
@@ -182,13 +195,21 @@ class MultiImageObsEncoder(ModuleAttrMixin):
     def output_shape(self):
         example_obs_dict = dict()
         obs_shape_meta = self.shape_meta['obs']
+        n_obs_steps = self.shape_meta['n_obs_steps']
+        n_img_skips = self.shape_meta['n_img_skips']
         batch_size = 1
         for key, attr in obs_shape_meta.items():
             shape = tuple(attr['shape'])
-            this_obs = torch.zeros(
-                (batch_size,) + shape, 
-                dtype=self.dtype,
-                device=self.device)
+            if attr['type'] == 'low_dim':
+                this_obs = torch.zeros(
+                    (batch_size,n_obs_steps,) + shape, 
+                    dtype=self.dtype,
+                    device=self.device)
+            else:
+                this_obs = torch.zeros(
+                    (batch_size,n_obs_steps//n_img_skips,) + shape, 
+                    dtype=self.dtype,
+                    device=self.device)
             example_obs_dict[key] = this_obs
         example_output = self.forward(example_obs_dict)
         output_shape = example_output.shape[1:]

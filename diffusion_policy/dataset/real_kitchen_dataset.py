@@ -17,6 +17,8 @@ class RealKitchenDataset(BaseImageDataset):
     def __init__(self,
             zarr_path, 
             horizon=1,
+            dataset_obs_steps=1,
+            n_img_skips=1,
             pad_before=0,
             pad_after=0,
             seed=42,
@@ -26,7 +28,7 @@ class RealKitchenDataset(BaseImageDataset):
         
         super().__init__()
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            zarr_path, keys=['img', 'state', 'action'])
+            zarr_path, keys=['wrist', 'scene', 'state', 'action'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, 
             val_ratio=val_ratio,
@@ -45,6 +47,8 @@ class RealKitchenDataset(BaseImageDataset):
             episode_mask=train_mask)
         self.train_mask = train_mask
         self.horizon = horizon
+        self.dataset_obs_steps = dataset_obs_steps
+        self.n_img_skips = n_img_skips
         self.pad_before = pad_before
         self.pad_after = pad_after
 
@@ -63,24 +67,29 @@ class RealKitchenDataset(BaseImageDataset):
     def get_normalizer(self, mode='limits', **kwargs):
         data = {
             'action': self.replay_buffer['action'],
-            'eef_pose': self.replay_buffer['state']
+            'pose_ee': self.replay_buffer['state']
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
-        normalizer['image'] = get_image_range_normalizer()
+        normalizer['wrist'] = get_image_range_normalizer()
+        normalizer['scene'] = get_image_range_normalizer()
         return normalizer
 
     def __len__(self) -> int:
         return len(self.sampler)
 
     def _sample_to_data(self, sample):
-        eff_pose = sample['state'].astype(np.float32)
-        image = np.moveaxis(sample['img'],-1,1)/255
-
+        pose_ee = sample['state'].astype(np.float32)[:self.dataset_obs_steps]
+        wrist = np.moveaxis(sample['wrist'],-1,1)/255 
+        scene = np.moveaxis(sample['scene'],-1,1)/255
+        wrist = wrist[self.n_img_skips-1:self.dataset_obs_steps:self.n_img_skips] # start index 7, step 8 so that latest obs is included
+        scene = scene[self.n_img_skips-1:self.dataset_obs_steps:self.n_img_skips]
+        
         data = {
             'obs': {
-                'image': image, # T, 3, 480, 640
-                'eef_pose': eff_pose, # T, 8
+                'wrist': wrist, # T//8, 3, 480, 640
+                'scene': scene, # T//8, 3, 480, 640
+                'pose_ee': pose_ee, # T, 8
             },
             'action': sample['action'].astype(np.float32) # T, 8
         }

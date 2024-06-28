@@ -9,8 +9,9 @@ task_name: ${task.name}
 shape_meta: ${task.shape_meta}
 exp_name: "default"
 
-horizon: 16
-n_obs_steps: 4
+horizon: 40
+n_obs_steps: 24
+n_img_skips: 8
 n_action_steps: 8
 n_latency_steps: 0
 dataset_obs_steps: ${n_obs_steps}
@@ -48,7 +49,7 @@ policy:
     random_crop: True
     use_group_norm: True
     share_rgb_model: False
-    imagenet_norm: True
+    imagenet_norm: False
 
   horizon: ${horizon}
   n_action_steps: ${eval:'${n_action_steps}+${n_latency_steps}'}
@@ -75,7 +76,7 @@ ema:
   max_value: 0.9999
 
 dataloader:
-  batch_size: 64
+  batch_size: 2
   num_workers: 2
   shuffle: True
   pin_memory: True
