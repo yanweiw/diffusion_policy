@@ -18,7 +18,7 @@ class RealKitchenDataset(BaseImageDataset):
             zarr_path, 
             horizon=1,
             dataset_obs_steps=1,
-            n_img_skips=1,
+            n_img_steps=1,
             pad_before=0,
             pad_after=0,
             seed=42,
@@ -48,7 +48,7 @@ class RealKitchenDataset(BaseImageDataset):
         self.train_mask = train_mask
         self.horizon = horizon
         self.dataset_obs_steps = dataset_obs_steps
-        self.n_img_skips = n_img_skips
+        self.n_img_steps = n_img_steps
         self.pad_before = pad_before
         self.pad_after = pad_after
 
@@ -82,13 +82,13 @@ class RealKitchenDataset(BaseImageDataset):
         pose_ee = sample['state'].astype(np.float32)[:self.dataset_obs_steps]
         wrist = np.moveaxis(sample['wrist'],-1,1)/255 
         scene = np.moveaxis(sample['scene'],-1,1)/255
-        wrist = wrist[self.n_img_skips-1:self.dataset_obs_steps:self.n_img_skips] # start index 7, step 8 so that latest obs is included
-        scene = scene[self.n_img_skips-1:self.dataset_obs_steps:self.n_img_skips]
+        wrist = wrist[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps] # start index 7, step 8 so that latest obs is included
+        scene = scene[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps]
         
         data = {
             'obs': {
-                'wrist': wrist, # T//8, 3, 480, 640
-                'scene': scene, # T//8, 3, 480, 640
+                'wrist': wrist, # T, 3, 480, 640
+                'scene': scene, # T, 3, 480, 640
                 'pose_ee': pose_ee, # T, 8
             },
             'action': sample['action'].astype(np.float32) # T, 8

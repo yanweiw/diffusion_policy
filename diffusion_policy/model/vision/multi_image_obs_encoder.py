@@ -69,9 +69,9 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                         )
                     # change conv1 to accept stacked images
                     n_obs_steps = shape_meta['n_obs_steps']
-                    n_img_skips = shape_meta['n_img_skips']
+                    n_img_steps = shape_meta['n_img_steps']
                     this_model.conv1 = nn.Conv2d(
-                        in_channels=shape[0]*n_obs_steps//n_img_skips,
+                        in_channels=shape[0]*n_img_steps,
                         out_channels=64,
                         kernel_size=(7, 7),
                         stride=(2, 2),
@@ -91,7 +91,7 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                     this_resizer = torchvision.transforms.Resize(
                         size=(h,w)
                     )
-                    input_shape = (shape[0]*n_obs_steps//n_img_skips,h,w)
+                    input_shape = (shape[0]*n_img_steps,h,w)
 
                 # configure randomizer
                 this_randomizer = nn.Identity()
@@ -196,7 +196,7 @@ class MultiImageObsEncoder(ModuleAttrMixin):
         example_obs_dict = dict()
         obs_shape_meta = self.shape_meta['obs']
         n_obs_steps = self.shape_meta['n_obs_steps']
-        n_img_skips = self.shape_meta['n_img_skips']
+        n_img_steps = self.shape_meta['n_img_steps']
         batch_size = 1
         for key, attr in obs_shape_meta.items():
             shape = tuple(attr['shape'])
@@ -207,7 +207,7 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                     device=self.device)
             else:
                 this_obs = torch.zeros(
-                    (batch_size,n_obs_steps//n_img_skips,) + shape, 
+                    (batch_size,n_img_steps,) + shape, 
                     dtype=self.dtype,
                     device=self.device)
             example_obs_dict[key] = this_obs

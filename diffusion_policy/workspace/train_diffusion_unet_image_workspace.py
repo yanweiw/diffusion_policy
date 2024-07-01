@@ -69,8 +69,10 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
                 self.load_checkpoint(path=lastest_ckpt_path)
 
         # configure dataset
+        print("loading dataset: ", cfg.task.dataset)
         dataset: BaseImageDataset
         dataset = hydra.utils.instantiate(cfg.task.dataset)
+        print("dataset length: ", len(dataset))
         assert isinstance(dataset, BaseImageDataset)
         train_dataloader = DataLoader(dataset, **cfg.dataloader)
         normalizer = dataset.get_normalizer()
