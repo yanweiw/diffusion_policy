@@ -72,5 +72,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('-d', '--datasource', required=True, help='Path to data file')
     # args = parser.parse_args()
-    datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05']
+    datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05', 'bowl06', 'bowl07']
     main(datasource_list)

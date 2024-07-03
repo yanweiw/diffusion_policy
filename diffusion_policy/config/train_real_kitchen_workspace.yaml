@@ -46,7 +46,7 @@ policy:
       weights: null
     resize_shape: [240, 320]
     crop_shape: [216, 288] # ch, cw 240x320 90%
-    random_crop: True
+    random_crop: False
     use_group_norm: True
     share_rgb_model: False
     imagenet_norm: False
@@ -104,7 +104,7 @@ training:
   # optimization
   lr_scheduler: cosine
   lr_warmup_steps: 500
-  num_epochs: 2000
+  num_epochs: 1000
   gradient_accumulate_every: 1
   # EMA destroys performance when used with BatchNorm
   # replace BatchNorm with GroupNorm.
