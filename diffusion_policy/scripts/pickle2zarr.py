@@ -7,7 +7,7 @@ import os, pickle
 import cv2
 
 
-def main(datasource_list):
+def main(datasource_list, save_dir):
     episode_end = 0
     episode_ends = []
     state_list = []
@@ -57,21 +57,22 @@ def main(datasource_list):
             episode_ends.append(episode_end) 
 
     print('total episodes: ', len(episode_ends))
-    save_path = os.path.join('/home/rss/diffusion_policy/data/kitchen', datasource_list[0]) + '.zarr'
+    print('total steps: ', np.vstack(state_list).shape[0])
+    save_path = os.path.join('/home/rss/diffusion_policy/data/kitchen', save_dir) + '.zarr'
     data_root = zarr.open_group(save_path, mode='w')
     data = data_root.create_group('data')
     data.create_dataset('state', data=np.concatenate(state_list, axis=0), dtype='float32')
     data.create_dataset('action', data=np.concatenate(action_list, axis=0), dtype='float32')
     data.create_dataset('wrist', data=np.concatenate(wristrgb_list, axis=0), dtype='uint8')
-    # data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
+    data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
     meta = data_root.create_group('meta')
     meta.create_dataset('episode_ends', data=np.array(episode_ends))
     print('data saved to: ', os.path.abspath(save_path))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # parser.add_argument('-d', '--datasource', required=True, help='Path to data file')
-    # args = parser.parse_args()
-    # datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05', 'bowl06', 'bowl07']
+    parser.add_argument('-d', '--save_dir', required=True, help='Path to save data')
+    args = parser.parse_args()
+    # datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05']
     datasource_list = ['bowl07', 'bowl08']
-    main(datasource_list)
+    main(datasource_list, args.save_dir)

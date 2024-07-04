@@ -28,8 +28,8 @@ class RealKitchenDataset(BaseImageDataset):
         
         super().__init__()
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            # zarr_path, keys=['wrist', 'scene', 'state', 'action'])
-            zarr_path, keys=['wrist', 'state', 'action'])
+            zarr_path, keys=['wrist', 'scene', 'state', 'action'])
+            # zarr_path, keys=['wrist', 'state', 'action'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, 
             episode_lengths=self.replay_buffer.episode_lengths,
@@ -74,7 +74,7 @@ class RealKitchenDataset(BaseImageDataset):
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
         normalizer['wrist'] = get_image_range_normalizer()
-        # normalizer['scene'] = get_image_range_normalizer()
+        normalizer['scene'] = get_image_range_normalizer()
         return normalizer
 
     def __len__(self) -> int:
@@ -83,14 +83,14 @@ class RealKitchenDataset(BaseImageDataset):
     def _sample_to_data(self, sample):
         pose_ee = sample['state'].astype(np.float32)[:self.dataset_obs_steps]
         wrist = np.moveaxis(sample['wrist'],-1,1)/255 
-        # scene = np.moveaxis(sample['scene'],-1,1)/255
+        scene = np.moveaxis(sample['scene'],-1,1)/255
         wrist = wrist[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps] # start index 7, step 8 so that latest obs is included
-        # scene = scene[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps]
+        scene = scene[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps]
         
         data = {
             'obs': {
                 'wrist': wrist, # T, 3, 480, 640
-                # 'scene': scene, # T, 3, 480, 640
+                'scene': scene, # T, 3, 480, 640
                 'pose_ee': pose_ee, # T, 8
             },
             'action': sample['action'].astype(np.float32) # T, 8
