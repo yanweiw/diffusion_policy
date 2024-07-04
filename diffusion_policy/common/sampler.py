@@ -47,15 +47,18 @@ def create_indices(
     return indices
 
 
-def get_val_mask(n_episodes, val_ratio, seed=0):
+def get_val_mask(n_episodes, episode_lengths, val_ratio, seed=0):
     val_mask = np.zeros(n_episodes, dtype=bool)
     if val_ratio <= 0:
         return val_mask
 
     # have at least 1 episode for validation, and at least 1 episode for train
     n_val = min(max(1, round(n_episodes * val_ratio)), n_episodes-1)
-    rng = np.random.default_rng(seed=seed)
-    val_idxs = rng.choice(n_episodes, size=n_val, replace=False)
+    # rng = np.random.default_rng(seed=seed)
+    # val_idxs = rng.choice(n_episodes, size=n_val, replace=False)
+
+    # sort the list by episode length and choose the smallest episodes as val set
+    val_idxs = np.argsort(episode_lengths)[:n_val]
     val_mask[val_idxs] = True
     return val_mask
 

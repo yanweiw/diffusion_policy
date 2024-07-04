@@ -63,7 +63,7 @@ def main(datasource_list):
     data.create_dataset('state', data=np.concatenate(state_list, axis=0), dtype='float32')
     data.create_dataset('action', data=np.concatenate(action_list, axis=0), dtype='float32')
     data.create_dataset('wrist', data=np.concatenate(wristrgb_list, axis=0), dtype='uint8')
-    data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
+    # data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
     meta = data_root.create_group('meta')
     meta.create_dataset('episode_ends', data=np.array(episode_ends))
     print('data saved to: ', os.path.abspath(save_path))
@@ -72,5 +72,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # parser.add_argument('-d', '--datasource', required=True, help='Path to data file')
     # args = parser.parse_args()
-    datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05', 'bowl06', 'bowl07']
+    # datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05', 'bowl06', 'bowl07']
+    datasource_list = ['bowl07', 'bowl08']
     main(datasource_list)

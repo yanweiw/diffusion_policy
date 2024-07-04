@@ -176,16 +176,16 @@ class MultiImageObsEncoder(ModuleAttrMixin):
                 feature = self.key_model_map[key](img)
                 features.append(feature)
         
-        # process lowdim input
-        for key in self.low_dim_keys:
-            data = obs_dict[key]
-            if batch_size is None:
-                batch_size = data.shape[0]
-            else:
-                assert batch_size == data.shape[0]
-            assert data.shape[2:] == self.key_shape_map[key]
-            data = data.reshape(batch_size, -1) # reshape from (B,T,D) to (B,T*D)
-            features.append(data)
+        # # process lowdim input
+        # for key in self.low_dim_keys:
+        #     data = obs_dict[key]
+        #     if batch_size is None:
+        #         batch_size = data.shape[0]
+        #     else:
+        #         assert batch_size == data.shape[0]
+        #     assert data.shape[2:] == self.key_shape_map[key]
+        #     data = data.reshape(batch_size, -1) # reshape from (B,T,D) to (B,T*D)
+        #     features.append(data)
         
         # concatenate all features
         result = torch.cat(features, dim=-1)

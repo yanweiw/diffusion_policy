@@ -26,7 +26,7 @@ policy:
   
   noise_scheduler:
     _target_: diffusers.schedulers.scheduling_ddim.DDIMScheduler
-    num_train_timesteps: 100
+    num_train_timesteps: 50 #100
     beta_start: 0.0001
     beta_end: 0.02
     # beta_schedule is important
@@ -46,7 +46,7 @@ policy:
       weights: null
     resize_shape: [240, 320]
     crop_shape: [216, 288] # ch, cw 240x320 90%
-    random_crop: False
+    random_crop: True
     use_group_norm: True
     share_rgb_model: False
     imagenet_norm: False
@@ -58,7 +58,7 @@ policy:
   obs_as_global_cond: ${obs_as_global_cond}
   # crop_shape: null
   diffusion_step_embed_dim: 128
-  down_dims: [512, 1024, 2048]
+  down_dims: [128, 256, 512] #[512, 1024, 2048]
   kernel_size: 5
   n_groups: 8
   cond_predict_scale: True
@@ -113,7 +113,7 @@ training:
   # training loop control
   # in epochs
   rollout_every: 50
-  checkpoint_every: 500
+  checkpoint_every: 200
   val_every: 10
   sample_every: 10
   # steps per epoch
@@ -125,7 +125,7 @@ training:
 logging:
   project: diffusion_policy_debug
   resume: True
-  mode: online
+  mode: disabled #online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
   tags: ["${name}", "${task_name}", "${exp_name}"]
   id: null
