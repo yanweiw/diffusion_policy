@@ -35,7 +35,6 @@ class RealKitchenDataset(BaseImageDataset):
             episode_lengths=self.replay_buffer.episode_lengths,
             val_ratio=val_ratio,
             seed=seed)
-        from IPython import embed; embed()
         train_mask = ~val_mask
         train_mask = downsample_mask(
             mask=train_mask, 
