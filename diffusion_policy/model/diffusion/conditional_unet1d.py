@@ -168,9 +168,7 @@ class ConditionalUnet1D(nn.Module):
 
         # add auxillary 2 layer network to predict delta action from global condition
         self.delta_action_predictor = nn.Sequential(
-            nn.Linear(global_cond_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, input_dim),
+            nn.Linear(global_cond_dim, input_dim),
         )
 
         logger.info(

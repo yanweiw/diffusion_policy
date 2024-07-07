@@ -74,5 +74,5 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--save_dir', required=True, help='Path to save data')
     args = parser.parse_args()
     # datasource_list = ['bowl00', 'bowl01', 'bowl02', 'bowl03', 'bowl04', 'bowl05']
-    datasource_list = ['bowl09']
+    datasource_list = ['bowl07', 'bowl08', 'bowl09', 'bowl10']
     main(datasource_list, args.save_dir)
