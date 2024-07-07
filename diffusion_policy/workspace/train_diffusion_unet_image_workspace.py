@@ -169,8 +169,8 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
                             train_sampling_batch = batch
 
                         # compute loss
-                        raw_loss = self.model.compute_loss(batch)
-                        loss = raw_loss / cfg.training.gradient_accumulate_every
+                        raw_loss, action_delta_loss = self.model.compute_loss(batch)
+                        loss = (raw_loss + 0.1*action_delta_loss)/ cfg.training.gradient_accumulate_every
                         loss.backward()
 
                         # step optimizer
@@ -185,10 +185,12 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
 
                         # logging
                         raw_loss_cpu = raw_loss.item()
+                        action_delta_loss_cpu = action_delta_loss.item()
                         tepoch.set_postfix(loss=raw_loss_cpu, refresh=False)
                         train_losses.append(raw_loss_cpu)
                         step_log = {
                             'train_loss': raw_loss_cpu,
+                            'train_action_delta_loss': action_delta_loss_cpu,
                             'global_step': self.global_step,
                             'epoch': self.epoch,
                             'lr': lr_scheduler.get_last_lr()[0]
@@ -231,7 +233,7 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
                                 leave=False, mininterval=cfg.training.tqdm_interval_sec) as tepoch:
                             for batch_idx, batch in enumerate(tepoch):
                                 batch = dict_apply(batch, lambda x: x.to(device, non_blocking=True))
-                                loss = self.model.compute_loss(batch)
+                                loss, _ = self.model.compute_loss(batch)
                                 val_losses.append(loss)
                                 
                                 obs_dict = batch['obs']

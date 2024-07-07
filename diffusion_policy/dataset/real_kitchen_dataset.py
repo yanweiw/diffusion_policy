@@ -69,7 +69,8 @@ class RealKitchenDataset(BaseImageDataset):
     def get_normalizer(self, mode='limits', **kwargs):
         data = {
             'action': self.replay_buffer['action'],
-            'pose_ee': self.replay_buffer['state']
+            'pose_ee': self.replay_buffer['state'], 
+            'action_delta': self.replay_buffer['action'] - self.replay_buffer['state']
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -86,14 +87,17 @@ class RealKitchenDataset(BaseImageDataset):
         scene = np.moveaxis(sample['scene'],-1,1)/255
         wrist = wrist[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps] # start index 7, step 8 so that latest obs is included
         scene = scene[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps]
+        action_delta = sample['action'] - sample['state']
+        action_delta = action_delta[self.dataset_obs_steps-1].astype(np.float32)
         
         data = {
             'obs': {
-                'wrist': wrist, # T, 3, 480, 640
-                'scene': scene, # T, 3, 480, 640
-                'pose_ee': pose_ee, # T, 8
+                'wrist': wrist, # T_img_steps, 3, 480, 640
+                'scene': scene, # T_img_steps, 3, 480, 640
+                'pose_ee': pose_ee, # T_obs_steps, 8
             },
-            'action': sample['action'].astype(np.float32) # T, 8
+            'action': sample['action'].astype(np.float32), # T, 8
+            'action_delta': action_delta # 1, 8
         }
         return data
     

@@ -108,7 +108,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
             trajectory[condition_mask] = condition_data[condition_mask]
 
             # 2. predict model output
-            model_output = model(trajectory, t, 
+            model_output, _ = model(trajectory, t, 
                 local_cond=local_cond, global_cond=global_cond)
 
             # 3. compute previous image: x_t -> x_t-1
@@ -204,6 +204,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         assert 'valid_mask' not in batch
         nobs = self.normalizer.normalize(batch['obs'])
         nactions = self.normalizer['action'].normalize(batch['action'])
+        nactions_delta = self.normalizer['action_delta'].normalize(batch['action_delta'])
         batch_size = nactions.shape[0]
         horizon = nactions.shape[1]
 
@@ -253,7 +254,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         noisy_trajectory[condition_mask] = cond_data[condition_mask]
         
         # Predict the noise residual
-        pred = self.model(noisy_trajectory, timesteps, 
+        pred, action_delta_pred = self.model(noisy_trajectory, timesteps, 
             local_cond=local_cond, global_cond=global_cond)
 
         pred_type = self.noise_scheduler.config.prediction_type 
@@ -268,4 +269,10 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         loss = loss * loss_mask.type(loss.dtype)
         loss = reduce(loss, 'b ... -> b (...)', 'mean')
         loss = loss.mean()
-        return loss
+
+        # compute action delta loss
+        assert action_delta_pred.shape == nactions_delta.shape
+        action_delta_loss = F.mse_loss(action_delta_pred, nactions_delta, reduction='none')
+        action_delta_loss = action_delta_loss.mean()
+
+        return loss, action_delta_loss

@@ -166,6 +166,13 @@ class ConditionalUnet1D(nn.Module):
         self.down_modules = down_modules
         self.final_conv = final_conv
 
+        # add auxillary 2 layer network to predict delta action from global condition
+        self.delta_action_predictor = nn.Sequential(
+            nn.Linear(global_cond_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, input_dim),
+        )
+
         logger.info(
             "number of parameters: %e", sum(p.numel() for p in self.parameters())
         )
@@ -239,5 +246,7 @@ class ConditionalUnet1D(nn.Module):
         x = self.final_conv(x)
 
         x = einops.rearrange(x, 'b t h -> b h t')
-        return x
 
+        action_delta_pred = self.delta_action_predictor(global_cond)
+
+        return x, action_delta_pred
