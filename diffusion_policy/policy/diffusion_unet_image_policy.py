@@ -205,6 +205,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         nobs = self.normalizer.normalize(batch['obs'])
         nactions = self.normalizer['action'].normalize(batch['action'])
         nactions_delta = self.normalizer['action_delta'].normalize(batch['action_delta'])
+        ngoal = self.normalizer['goal'].normalize(batch['goal'])
         batch_size = nactions.shape[0]
         horizon = nactions.shape[1]
 
@@ -254,7 +255,7 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         noisy_trajectory[condition_mask] = cond_data[condition_mask]
         
         # Predict the noise residual
-        pred, action_delta_pred = self.model(noisy_trajectory, timesteps, 
+        pred, auxiliary_pred = self.model(noisy_trajectory, timesteps, 
             local_cond=local_cond, global_cond=global_cond)
 
         pred_type = self.noise_scheduler.config.prediction_type 
@@ -270,9 +271,12 @@ class DiffusionUnetImagePolicy(BaseImagePolicy):
         loss = reduce(loss, 'b ... -> b (...)', 'mean')
         loss = loss.mean()
 
-        # compute action delta loss
-        assert action_delta_pred.shape == nactions_delta.shape
-        action_delta_loss = F.mse_loss(action_delta_pred, nactions_delta, reduction='none')
-        action_delta_loss = action_delta_loss.mean()
+        # compute auxiliary loss
+        # assert action_delta_pred.shape == nactions_delta.shape
+        # action_delta_loss = F.mse_loss(action_delta_pred, nactions_delta, reduction='none')
+        # action_delta_loss = action_delta_loss.mean()
+        assert auxiliary_pred.shape == ngoal.shape
+        auxiliary_loss = F.mse_loss(auxiliary_pred, ngoal, reduction='none')
+        auxiliary_loss = auxiliary_loss.mean()
 
-        return loss, action_delta_loss
+        return loss, auxiliary_loss

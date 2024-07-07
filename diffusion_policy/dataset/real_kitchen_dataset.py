@@ -28,7 +28,7 @@ class RealKitchenDataset(BaseImageDataset):
         
         super().__init__()
         self.replay_buffer = ReplayBuffer.copy_from_path(
-            zarr_path, keys=['wrist', 'scene', 'state', 'action'])
+            zarr_path, keys=['wrist', 'scene', 'state', 'action', 'goal'])
             # zarr_path, keys=['wrist', 'state', 'action'])
         val_mask = get_val_mask(
             n_episodes=self.replay_buffer.n_episodes, 
@@ -70,7 +70,8 @@ class RealKitchenDataset(BaseImageDataset):
         data = {
             'action': self.replay_buffer['action'],
             'pose_ee': self.replay_buffer['state'], 
-            'action_delta': self.replay_buffer['action'] - self.replay_buffer['state']
+            'action_delta': self.replay_buffer['action'] - self.replay_buffer['state'],
+            'goal': self.replay_buffer['goal'],
         }
         normalizer = LinearNormalizer()
         normalizer.fit(data=data, last_n_dims=1, mode=mode, **kwargs)
@@ -89,6 +90,7 @@ class RealKitchenDataset(BaseImageDataset):
         scene = scene[self.dataset_obs_steps-self.n_img_steps:self.dataset_obs_steps]
         action_delta = sample['action'] - sample['state']
         action_delta = action_delta[self.dataset_obs_steps-1].astype(np.float32)
+        goal = sample['goal'][self.dataset_obs_steps-1].astype(np.float32)
         
         data = {
             'obs': {
@@ -97,7 +99,8 @@ class RealKitchenDataset(BaseImageDataset):
                 'pose_ee': pose_ee, # T_obs_steps, 8
             },
             'action': sample['action'].astype(np.float32), # T, 8
-            'action_delta': action_delta # 1, 8
+            'action_delta': action_delta, # 1, 8
+            'goal': goal, # 1, 7
         }
         return data
     

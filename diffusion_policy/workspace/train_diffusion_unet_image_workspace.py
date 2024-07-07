@@ -169,8 +169,8 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
                             train_sampling_batch = batch
 
                         # compute loss
-                        raw_loss, action_delta_loss = self.model.compute_loss(batch)
-                        loss = (raw_loss + 0.1*action_delta_loss)/ cfg.training.gradient_accumulate_every
+                        raw_loss, auxiliary_loss = self.model.compute_loss(batch)
+                        loss = (raw_loss + 0.1*auxiliary_loss)/ cfg.training.gradient_accumulate_every
                         loss.backward()
 
                         # step optimizer
@@ -185,12 +185,12 @@ class TrainDiffusionUnetImageWorkspace(BaseWorkspace):
 
                         # logging
                         raw_loss_cpu = raw_loss.item()
-                        action_delta_loss_cpu = action_delta_loss.item()
+                        auxiliary_loss_cpu = auxiliary_loss.item()
                         tepoch.set_postfix(loss=raw_loss_cpu, refresh=False)
                         train_losses.append(raw_loss_cpu)
                         step_log = {
                             'train_loss': raw_loss_cpu,
-                            'train_action_delta_loss': action_delta_loss_cpu,
+                            'train_auxiliary_loss': auxiliary_loss_cpu,
                             'global_step': self.global_step,
                             'epoch': self.epoch,
                             'lr': lr_scheduler.get_last_lr()[0]

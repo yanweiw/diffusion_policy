@@ -14,6 +14,7 @@ def main(datasource_list, save_dir):
     action_list = []
     wristrgb_list = []
     scenergb_list = []
+    goal_list = []
     
     for datasource in datasource_list:
         # read from folder 
@@ -32,6 +33,19 @@ def main(datasource_list, save_dir):
             print('state shape: ', state.shape)
             action = np.concatenate([state[1:], state[[-1]]], axis=0)
             print('action shape: ', action.shape)
+
+            goal = np.zeros((state.shape[0], 7))
+            current_value = None
+            # Iterate through the second array from back to front
+            for i in range(len(state)-1, -1, -1):
+                if i == len(state)-1:
+                    current_value = state[i, :7]
+                elif state[i, 7] != state[i+1, 7]:
+                    # Update the current value based on the transition
+                    current_value = state[i+1, :7]
+                # Copy the current value to the result array
+                goal[i] = current_value
+            print('goal shape: ', goal.shape)
             
             assert action.shape[0] == len(wristrgb), f"action shape: {action.shape}, wristrgb shape: {wristrgb.shape}"
             assert action.shape[0] == len(scenergb), f"action shape: {action.shape}, scenergb shape: {scenergb.shape}"
@@ -51,6 +65,7 @@ def main(datasource_list, save_dir):
             
             state_list.append(state)
             action_list.append(action)
+            goal_list.append(goal)
             wristrgb_list.append(wrist)
             scenergb_list.append(scene)
             episode_end += len(action)
@@ -65,6 +80,7 @@ def main(datasource_list, save_dir):
     data.create_dataset('action', data=np.concatenate(action_list, axis=0), dtype='float32')
     data.create_dataset('wrist', data=np.concatenate(wristrgb_list, axis=0), dtype='uint8')
     data.create_dataset('scene', data=np.concatenate(scenergb_list, axis=0), dtype='uint8')
+    data.create_dataset('goal', data=np.concatenate(goal_list, axis=0), dtype='float32')
     meta = data_root.create_group('meta')
     meta.create_dataset('episode_ends', data=np.array(episode_ends))
     print('data saved to: ', os.path.abspath(save_path))
