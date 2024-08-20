@@ -1,32 +1,43 @@
 defaults:
   - _self_
-  - task: real_kitchen
+  - task: real_kitchen_lowdim
 
-name: train_diffusion_unet_image
-_target_: diffusion_policy.workspace.train_diffusion_unet_image_workspace.TrainDiffusionUnetImageWorkspace
+name: train_diffusion_unet_lowdim
+_target_: diffusion_policy.workspace.train_diffusion_unet_lowdim_workspace.TrainDiffusionUnetLowdimWorkspace
 
+obs_dim: ${task.obs_dim}
+action_dim: ${task.action_dim}
+# keypoint_dim: ${task.keypoint_dim}
 task_name: ${task.name}
-shape_meta: ${task.shape_meta}
 exp_name: "default"
 
-horizon: 16
-n_obs_steps: 2
-n_img_steps: 2
-n_action_steps: 8
+horizon: 64
+n_obs_steps: 16
+n_action_steps: 32
 n_latency_steps: 0
-dataset_obs_steps: ${n_obs_steps}
 past_action_visible: True
 keypoint_visible_rate: 1.0
+obs_as_local_cond: False
 obs_as_global_cond: True
+pred_action_steps_only: False
 
 policy:
-  _target_: diffusion_policy.policy.diffusion_unet_image_policy.DiffusionUnetImagePolicy
+  _target_: diffusion_policy.policy.diffusion_unet_lowdim_policy.DiffusionUnetLowdimPolicy
 
-  shape_meta: ${shape_meta}
+  model:
+    _target_: diffusion_policy.model.diffusion.conditional_unet1d.ConditionalUnet1D
+    input_dim: "${eval: ${task.action_dim} if ${obs_as_local_cond} or ${obs_as_global_cond} else ${task.obs_dim} + ${task.action_dim}}"
+    local_cond_dim: "${eval: ${task.obs_dim} if ${obs_as_local_cond} else None}"
+    global_cond_dim: "${eval: ${task.obs_dim}*${n_obs_steps} if ${obs_as_global_cond} else None}"
+    diffusion_step_embed_dim: 128
+    down_dims: [256, 512, 1024]
+    kernel_size: 5
+    n_groups: 8
+    cond_predict_scale: True
   
   noise_scheduler:
     _target_: diffusers.schedulers.scheduling_ddim.DDIMScheduler
-    num_train_timesteps: 50
+    num_train_timesteps: 100
     beta_start: 0.0001
     beta_end: 0.02
     # beta_schedule is important
@@ -37,31 +48,16 @@ policy:
     steps_offset: 0
     prediction_type: epsilon # or sample
 
-  obs_encoder:
-    _target_: diffusion_policy.model.vision.multi_image_obs_encoder.MultiImageObsEncoder
-    shape_meta: ${shape_meta}
-    rgb_model:
-      _target_: diffusion_policy.model.vision.model_getter.get_resnet
-      name: resnet18
-      weights: null
-    resize_shape: [240, 320]
-    crop_shape: [216, 288] # ch, cw 240x320 90%
-    random_crop: True
-    use_group_norm: True
-    share_rgb_model: False
-    imagenet_norm: False
-
   horizon: ${horizon}
+  obs_dim: ${obs_dim}
+  action_dim: ${action_dim}
   n_action_steps: ${eval:'${n_action_steps}+${n_latency_steps}'}
   n_obs_steps: ${n_obs_steps}
   num_inference_steps: 16
+  obs_as_local_cond: ${obs_as_local_cond}
   obs_as_global_cond: ${obs_as_global_cond}
-  # crop_shape: null
-  diffusion_step_embed_dim: 128
-  down_dims: [128, 256, 512] #[512, 1024, 2048]
-  kernel_size: 5
-  n_groups: 8
-  cond_predict_scale: True
+  pred_action_steps_only: ${pred_action_steps_only}
+  oa_step_convention: True
   past_action_visible: ${past_action_visible}
 
   # scheduler.step params
@@ -76,14 +72,14 @@ ema:
   max_value: 0.9999
 
 dataloader:
-  batch_size: 64
+  batch_size: 256
   num_workers: 2
   shuffle: True
   pin_memory: True
   persistent_workers: False
 
 val_dataloader:
-  batch_size: 64
+  batch_size: 256
   num_workers: 2
   shuffle: False
   pin_memory: True
@@ -104,12 +100,9 @@ training:
   # optimization
   lr_scheduler: cosine
   lr_warmup_steps: 500
-  num_epochs: 1000
+  num_epochs: 600
   gradient_accumulate_every: 1
-  # EMA destroys performance when used with BatchNorm
-  # replace BatchNorm with GroupNorm.
   use_ema: True
-  freeze_encoder: False
   # training loop control
   # in epochs
   rollout_every: 50
@@ -125,7 +118,7 @@ training:
 logging:
   project: diffusion_policy_debug
   resume: True
-  mode: online
+  mode: disabled #online
   name: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
   tags: ["${name}", "${task_name}", "${exp_name}"]
   id: null

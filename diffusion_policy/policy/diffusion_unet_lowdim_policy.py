@@ -9,6 +9,8 @@ from diffusion_policy.model.common.normalizer import LinearNormalizer
 from diffusion_policy.policy.base_lowdim_policy import BaseLowdimPolicy
 from diffusion_policy.model.diffusion.conditional_unet1d import ConditionalUnet1D
 from diffusion_policy.model.diffusion.mask_generator import LowdimMaskGenerator
+from diffusion_policy.common.pytorch_util import dict_apply
+
 
 class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
     def __init__(self, 
@@ -24,6 +26,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             obs_as_global_cond=False,
             pred_action_steps_only=False,
             oa_step_convention=False,
+            past_action_visible=False,
             # parameters passed to step
             **kwargs):
         super().__init__()
@@ -37,7 +40,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             obs_dim=0 if (obs_as_local_cond or obs_as_global_cond) else obs_dim,
             max_n_obs_steps=n_obs_steps,
             fix_obs_steps=True,
-            action_visible=False
+            action_visible=past_action_visible
         )
         self.normalizer = LinearNormalizer()
         self.horizon = horizon
@@ -49,6 +52,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         self.obs_as_global_cond = obs_as_global_cond
         self.pred_action_steps_only = pred_action_steps_only
         self.oa_step_convention = oa_step_convention
+        self.past_action_visible = past_action_visible
         self.kwargs = kwargs
 
         if num_inference_steps is None:
@@ -134,6 +138,9 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 shape = (B, self.n_action_steps, Da)
             cond_data = torch.zeros(size=shape, device=device, dtype=dtype)
             cond_mask = torch.zeros_like(cond_data, dtype=torch.bool)
+            if self.past_action_visible:
+                cond_data[:,:To-1,:] = nobs[:,1:self.n_obs_steps,:]
+                cond_mask[:,:To-1,:] = True            
         else:
             # condition through impainting
             shape = (B, T, Da+Do)

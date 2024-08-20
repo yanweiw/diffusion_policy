@@ -1,0 +1,18 @@
+name: real_kitchen_lowdim
+
+obs_dim: 8 # 3 for position, 4 for quaternion, 1 for gripper
+action_dim: 8
+# keypoint_dim: 2
+
+env_runner:
+  _target_: diffusion_policy.env_runner.base_lowdim_runner.BaseLowdimRunner # just a placeholder
+
+dataset:
+  _target_: diffusion_policy.dataset.real_kitchen_lowdim_dataset.RealKitchenLowdimDataset
+  zarr_path: data/kitchen/bowl_micro01.zarr
+  horizon: ${horizon}
+  pad_before: ${eval:'${n_obs_steps}-1+${n_latency_steps}'}
+  pad_after: ${eval:'${n_action_steps}-1'}
+  seed: 42
+  val_ratio: 0.1
+  max_train_episodes: null #90

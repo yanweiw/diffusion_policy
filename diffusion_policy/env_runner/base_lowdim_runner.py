@@ -6,4 +6,5 @@ class BaseLowdimRunner:
         self.output_dir = output_dir
 
     def run(self, policy: BaseLowdimPolicy) -> Dict:
-        raise NotImplementedError()
+        # raise NotImplementedError()
+        return dict()
