@@ -63,7 +63,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
     def conditional_sample(self, 
             condition_data, condition_mask,
             local_cond=None, global_cond=None,
-            generator=None,
+            generator=None, guide=None,
             # keyword arguments to scheduler.step
             **kwargs
             ):
@@ -86,8 +86,17 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             # 2. predict model output
             model_output = model(trajectory, t, 
                 local_cond=local_cond, global_cond=global_cond)
+            
+            # 3. add interaction gradient
+            if guide is not None and t > 0: # stop adding noise as it will distract the plan
+                grad = self.guide_gradient_by_pixel(model_output, guide)
+                assert grad.shape == model_output.shape
+                guide_ratio = 1
+                # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
+                
+                model_output = model_output + guide_ratio * grad
 
-            # 3. compute previous image: x_t -> x_t-1
+            # 4. compute previous image: x_t -> x_t-1
             trajectory = scheduler.step(
                 model_output, t, trajectory, 
                 generator=generator,
@@ -98,9 +107,33 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         trajectory[condition_mask] = condition_data[condition_mask]        
 
         return trajectory
+    
+    def guide_gradient_by_pixel(self, naction, guide):
+        # guide = torch.tensor([0.628, -0.067, 0.694]).cuda().unsqueeze(0)
+        # naction: (B, pred_horizon, action_dim);
+        # guide: (1, guide_dim)
+        assert naction.shape[2] == 8 and guide.shape == (1, 3) # guide is only 3D point
+        # print('guide pixel:', guide)
+        # start_to_goal = [((1 - t) * naction[:, 0, :3] + t * guide) for t in torch.linspace(0, 1, naction.shape[1])]
+        # start_to_goal = torch.stack(start_to_goal, dim=1) # (B, pred_horizon, 3)
+        # indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
+        # guide = torch.unsqueeze(guide[indices], dim=0) # (1, pred_horizon, guide_dim)
+
+        # assert guide.shape == (1, naction.shape[1], 3)
+        guide = torch.unsqueeze(guide, dim=0) # (1, pred_horizon, guide_dim)
+        with torch.enable_grad():
+            naction.requires_grad_(True)
+            # dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)[:, (naction.shape[1]//2):].mean(dim=1) # (B,)
+            # dist = torch.min(torch.linalg.norm(naction[:, :, :3] - guide, dim=2), dim=1)[0] # (B,)
+            dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)
+            dist = dist**2 
+            dist = dist.mean(dim=1) # (B,)
+            grad = torch.autograd.grad(dist, naction, grad_outputs=torch.ones_like(dist), create_graph=True)[0]
+            naction.detach()
+        return grad   
 
 
-    def predict_action(self, obs_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+    def predict_action(self, obs_dict: Dict[str, torch.Tensor], guide=None) -> Dict[str, torch.Tensor]:
         """
         obs_dict: must include "obs" key
         result: must include "action" key
@@ -155,6 +188,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             cond_mask,
             local_cond=local_cond,
             global_cond=global_cond,
+            guide=guide,
             **self.kwargs)
         
         # unnormalize prediction
