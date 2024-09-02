@@ -89,9 +89,9 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             
             # 3. add interaction gradient
             if guide is not None and t > 0: # stop adding noise as it will distract the plan
-                grad = self.guide_gradient_by_pixel(model_output, guide)
+                grad = self.guide_gradient_by_pixel(model_output, guide, t)
                 assert grad.shape == model_output.shape
-                guide_ratio = 1
+                guide_ratio = 0.5
                 # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
                 
                 model_output = model_output + guide_ratio * grad
@@ -108,7 +108,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
 
         return trajectory
     
-    def guide_gradient_by_pixel(self, naction, guide):
+    def guide_gradient_by_pixel(self, naction, guide, t):
         # guide = torch.tensor([0.628, -0.067, 0.694]).cuda().unsqueeze(0)
         # naction: (B, pred_horizon, action_dim);
         # guide: (1, guide_dim)
@@ -125,9 +125,15 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             naction.requires_grad_(True)
             # dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)[:, (naction.shape[1]//2):].mean(dim=1) # (B,)
             # dist = torch.min(torch.linalg.norm(naction[:, :, :3] - guide, dim=2), dim=1)[0] # (B,)
-            dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)
-            dist = dist**2 
-            dist = dist.mean(dim=1) # (B,)
+            dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)**2 
+            dist_mean = dist.mean(dim=1) # (B,)
+            dist_min = torch.min(dist, dim=1)[0] # (B,)
+            print('dist:', dist_mean, dist_min)
+            if t > 50:
+                dist = 0.1*dist_mean
+            else:
+                dist = 0.1*dist_mean + 10*dist_min
+            
             grad = torch.autograd.grad(dist, naction, grad_outputs=torch.ones_like(dist), create_graph=True)[0]
             naction.detach()
         return grad   
