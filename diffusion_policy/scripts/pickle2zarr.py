@@ -58,6 +58,7 @@ def main(datasource_list, save_dir):
 
     print('total episodes: ', len(episode_ends))
     print('total steps: ', np.vstack(state_list).shape[0])
+    from IPython import embed; embed()
     save_path = os.path.join('/home/rss/diffusion_policy/data/kitchen', save_dir) + '.zarr'
     data_root = zarr.open_group(save_path, mode='w')
     data = data_root.create_group('data')
@@ -73,5 +74,5 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--save_dir', required=True, help='Path to save data')
     args = parser.parse_args()
-    datasource_list = ['micro04', 'micro05']
+    datasource_list = ['prompt']
     main(datasource_list, args.save_dir)
