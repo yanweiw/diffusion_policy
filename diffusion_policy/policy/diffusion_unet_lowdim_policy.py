@@ -213,58 +213,52 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         # set step values
         scheduler.set_timesteps(self.num_inference_steps)
 
+        MCMC_steps = 1
+
         for t in scheduler.timesteps:
-            # 1. apply conditioning
-            trajectory[condition_mask] = condition_data[condition_mask]
+            for i in range(MCMC_steps):
+                # 1. apply conditioning
+                trajectory[condition_mask] = condition_data[condition_mask]
 
-            # 2. predict model output
-            model_output = model(trajectory, t, 
-                local_cond=local_cond, global_cond=global_cond)
-            
-            # 3. add interaction gradient
-            if guide is not None: # stop adding noise as it will distract the plan
-                grad = self.guide_gradient_by_pixel(model_output, guide, t)
-                # assert grad.shape == model_output.shape
-                # grad0 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(micro_prompt).cuda(), t)
-                # grad1 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl1_prompt).cuda(), t)
-                # grad2 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl2_prompt).cuda(), t)
-                # print .3 floating point precision without scientific notation
-                # torch.set_printoptions(precision=3, sci_mode=False)
-                # print('grad0/1/2 norm at time t: ',t, '\n',
-                    #   torch.mean(grad0[:, :, :3], dim=(0, 1)).cpu(), '\n',
-                    #   torch.mean(grad1[:, :, :3], dim=(0, 1)).cpu(), '\n',
-                    #   torch.mean(grad2[:, :, :3], dim=(0, 1)).cpu(), '\n',
-                    #   torch.mean(model_output[:, :, :3], dim=(0, 1)).cpu())
-                guide_ratio = 100 * 0.98**(self.num_inference_steps - t)
-                # guide_ratio = 100
-                # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
-                assert model_output.shape == grad.shape
+                # 2. predict model output
+                model_output = model(trajectory, t, 
+                    local_cond=local_cond, global_cond=global_cond)
                 
-                model_output = model_output + guide_ratio * grad
-                # print('new model_output:\n', torch.mean(model_output[:, :, :3], dim=(0, 1)).cpu())
+                # 3. add interaction gradient
+                if guide is not None: # stop adding noise as it will distract the plan
+                    grad = self.guide_gradient_by_pixel(model_output, guide, t)
+                    guide_ratio = 20 * 0.98**(self.num_inference_steps - t)
+                    # guide_ratio = 1
+                    # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
+                    assert model_output.shape == grad.shape                
+                    model_output = model_output + guide_ratio * grad
 
-            # # 5. visualize
-            # if visualizer is not None and guide is not None:
-            #     # action = self.normalizer['action'].unnormalize(trajectory)
-            #     # action = action.detach().cpu().numpy()
-            #     score = None                        
-            #     # action_marker = action.reshape(-1, 8)
-            #     guide_marker = self.normalizer['action'].unnormalize(guide)
-            #     guide_marker = guide_marker.detach().cpu().numpy()
+                # # 5. visualize
+                # if visualizer is not None and guide is not None:
+                #     # action = self.normalizer['action'].unnormalize(trajectory)
+                #     # action = action.detach().cpu().numpy()
+                #     # action_marker = action.reshape(-1, 8)
+                #     visualizer.viz_traj(traj_ee=guide_marker, scores=None)  
+                #     # print('timestep:', t)
+                #     # time.sleep(0.001)
 
-            #     # print('guide orginal length:', guide_marker.shape)
-            #     # print('guide_original:', guide_marker)
-            #     visualizer.viz_traj(traj_ee=guide_marker, scores=score)  
-            #     # print('timestep:', t)
-            #     # pause for visualization for 0.1s
-            #     # time.sleep(0.001)
-
-            # 4. compute previous image: x_t -> x_t-1
-            trajectory = scheduler.step(
-                model_output, t, trajectory, 
-                generator=generator,
-                **kwargs
-                ).prev_sample
+                # 4. compute previous image: x_t -> x_t-1
+                if i == MCMC_steps - 1:
+                    # print('final mcmc step at t:', t)
+                    trajectory = scheduler.step(
+                        model_output, t, trajectory, 
+                        generator=generator,
+                        **kwargs
+                        ).prev_sample
+                else:
+                    # print('mcmc step i: ', i, 'at t: ', t)
+                    clean_sample = scheduler.step(
+                        model_output, t, trajectory, 
+                        generator=generator,
+                        **kwargs
+                        ).pred_original_sample
+                    noise = torch.randn(clean_sample.shape, device=clean_sample.device)
+                    trajectory = self.noise_scheduler.add_noise(clean_sample, noise, t)
 
         # time.sleep(1)
 
