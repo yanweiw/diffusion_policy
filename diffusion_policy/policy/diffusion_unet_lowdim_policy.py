@@ -294,7 +294,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             naction = naction.clone().detach().requires_grad_(True)
             # dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)[:, (naction.shape[1]//2):].mean(dim=1) # (B,)
             # dist = torch.min(torch.linalg.norm(naction[:, :, :3] - start_to_goal, dim=2), dim=1)[0] # (B,)
-            dist = torch.linalg.norm(naction[:, :, :3] - guide[:, :, :3], dim=2) # (B, pred_horizon)
+            dist = torch.linalg.norm(naction[:, :, :3] - guide[:, :, :3], dim=2, ord=2)**2 # (B, pred_horizon)
             dist = dist.mean(dim=1) # (B,)
             # dist_min = torch.min(dist, dim=1)[0] # (B,)
             # print('dist:', dist_mean, dist_min)
