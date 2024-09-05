@@ -173,6 +173,26 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             device=condition_data.device,
             generator=generator)
         
+        # # use micro prompt as base trajectory and add guassian noise
+        # # first make micro prompt the same shape as trajectory
+        # prompt = torch.from_numpy(micro_prompt).float().cuda()
+        # indices = torch.linspace(0, prompt.shape[0]-1, trajectory.shape[1], dtype=int)
+        # prompt = torch.unsqueeze(prompt[indices], dim=0) # (1, pred_horizon, guide_dim)
+        # prompt = self.normalizer['action'].normalize(prompt)
+
+        # # add gaussian noise
+        # std = 0.00
+        # trajectory = std * trajectory + prompt
+
+        if guide is not None:
+            # normalize guide
+            # guide_original = guide.clone()
+            guide = self.normalizer['action'].normalize(guide)
+
+        if guide is not None and visualizer is not None:
+            guide_markers = self.normalizer['action'].unnormalize(guide)
+            visualizer.viz_guide(guide_markers)
+
         # if guide is not None:
         #     # assert guide.shape == (1, 3) # guide is only 3D point
         #     assert guide.shape[1:] == (8,) # guide is a partial trajectory
@@ -202,25 +222,42 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 local_cond=local_cond, global_cond=global_cond)
             
             # 3. add interaction gradient
-            if guide is not None and t > 0: # stop adding noise as it will distract the plan
+            if guide is not None: # stop adding noise as it will distract the plan
                 grad = self.guide_gradient_by_pixel(model_output, guide, t)
                 # assert grad.shape == model_output.shape
-                grad0 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(micro_prompt).cuda(), t)
-                grad1 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl1_prompt).cuda(), t)
-                grad2 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl2_prompt).cuda(), t)
+                # grad0 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(micro_prompt).cuda(), t)
+                # grad1 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl1_prompt).cuda(), t)
+                # grad2 = self.guide_gradient_by_pixel(model_output, torch.from_numpy(bowl2_prompt).cuda(), t)
                 # print .3 floating point precision without scientific notation
-                torch.set_printoptions(precision=3, sci_mode=False)
+                # torch.set_printoptions(precision=3, sci_mode=False)
                 # print('grad0/1/2 norm at time t: ',t, '\n',
                     #   torch.mean(grad0[:, :, :3], dim=(0, 1)).cpu(), '\n',
                     #   torch.mean(grad1[:, :, :3], dim=(0, 1)).cpu(), '\n',
                     #   torch.mean(grad2[:, :, :3], dim=(0, 1)).cpu(), '\n',
                     #   torch.mean(model_output[:, :, :3], dim=(0, 1)).cpu())
-                guide_ratio = 100
+                guide_ratio = 100 * 0.98**(self.num_inference_steps - t)
+                # guide_ratio = 100
                 # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
                 assert model_output.shape == grad.shape
                 
                 model_output = model_output + guide_ratio * grad
                 # print('new model_output:\n', torch.mean(model_output[:, :, :3], dim=(0, 1)).cpu())
+
+            # # 5. visualize
+            # if visualizer is not None and guide is not None:
+            #     # action = self.normalizer['action'].unnormalize(trajectory)
+            #     # action = action.detach().cpu().numpy()
+            #     score = None                        
+            #     # action_marker = action.reshape(-1, 8)
+            #     guide_marker = self.normalizer['action'].unnormalize(guide)
+            #     guide_marker = guide_marker.detach().cpu().numpy()
+
+            #     # print('guide orginal length:', guide_marker.shape)
+            #     # print('guide_original:', guide_marker)
+            #     visualizer.viz_traj(traj_ee=guide_marker, scores=score)  
+            #     # print('timestep:', t)
+            #     # pause for visualization for 0.1s
+            #     # time.sleep(0.001)
 
             # 4. compute previous image: x_t -> x_t-1
             trajectory = scheduler.step(
@@ -229,18 +266,6 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 **kwargs
                 ).prev_sample
 
-        #     # 5. visualize
-        #     if visualizer is not None:
-        #         action = self.normalizer['action'].unnormalize(trajectory)
-        #         action = action.detach().cpu().numpy()
-        #         score = None                        
-        #         action_marker = action.reshape(-1, 8)
-        #         visualizer.viz_traj(traj_ee=action_marker, scores=score)  
-        #         print('timestep:', t)
-        #         # pause for visualization for 0.1s
-        #         time.sleep(0.001)
-        #         if t < 10:
-        #             from IPython import embed; embed()
         # time.sleep(1)
 
         # finally make sure conditioning is enforced
