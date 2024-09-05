@@ -213,7 +213,8 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         # set step values
         scheduler.set_timesteps(self.num_inference_steps)
 
-        MCMC_steps = 1
+        MCMC_steps = 5
+        clean_sample = None
 
         for t in scheduler.timesteps:
             for i in range(MCMC_steps):
@@ -225,10 +226,10 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                     local_cond=local_cond, global_cond=global_cond)
                 
                 # 3. add interaction gradient
-                if guide is not None: # stop adding noise as it will distract the plan
-                    grad = self.guide_gradient_by_pixel(model_output, guide, t)
-                    guide_ratio = 20 * 0.98**(self.num_inference_steps - t)
-                    # guide_ratio = 1
+                if guide is not None and clean_sample is not None: # stop adding noise as it will distract the plan
+                    grad = self.guide_gradient_by_pixel(clean_sample, guide, t)
+                    # guide_ratio = 200 * 0.98**(self.num_inference_steps - t)
+                    guide_ratio = 200
                     # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
                     assert model_output.shape == grad.shape                
                     model_output = model_output + guide_ratio * grad
@@ -243,27 +244,25 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 #     # time.sleep(0.001)
 
                 # 4. compute previous image: x_t -> x_t-1
-                if i == MCMC_steps - 1:
-                    # print('final mcmc step at t:', t)
-                    trajectory = scheduler.step(
+                scheduler_output = scheduler.step(
                         model_output, t, trajectory, 
                         generator=generator,
-                        **kwargs
-                        ).prev_sample
-                else:
-                    # print('mcmc step i: ', i, 'at t: ', t)
-                    clean_sample = scheduler.step(
-                        model_output, t, trajectory, 
-                        generator=generator,
-                        **kwargs
-                        ).pred_original_sample
-                    noise = torch.randn(clean_sample.shape, device=clean_sample.device)
-                    trajectory = self.noise_scheduler.add_noise(clean_sample, noise, t)
+                        **kwargs)
+                prev_sample = scheduler_output.prev_sample
+                clean_sample = scheduler_output.pred_original_sample    
 
-        # time.sleep(1)
+                if i < MCMC_steps - 1:
+                    # print('mcmc step i: ', i, 'at t: ', t)
+                    std = 1
+                    noise = std * torch.randn(clean_sample.shape, device=clean_sample.device)
+                    trajectory = self.noise_scheduler.add_noise(clean_sample, noise, t)
+                else:
+                    # print('final mcmc step at t:', t)
+                    trajectory = prev_sample
 
         # finally make sure conditioning is enforced
         trajectory[condition_mask] = condition_data[condition_mask]        
+        # time.sleep(1)
 
         return trajectory
     
