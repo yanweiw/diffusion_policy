@@ -227,8 +227,8 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 
                 # 3. add interaction gradient
                 if guide is not None and clean_sample is not None: # stop adding noise as it will distract the plan
-                    grad = self.guide_gradient_by_pixel(clean_sample, guide, t)
-                    # guide_ratio = 200 * 0.98**(self.num_inference_steps - t)
+                    grad = self.guide_gradient_by_pixel(trajectory, guide, t)
+                    # guide_ratio = 20 * 0.98**(self.num_inference_steps - t)
                     guide_ratio = 200
                     # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
                     assert model_output.shape == grad.shape                
