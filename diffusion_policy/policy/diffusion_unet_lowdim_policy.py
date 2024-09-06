@@ -160,7 +160,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
     def conditional_sample(self, 
             condition_data, condition_mask,
             local_cond=None, global_cond=None,
-            generator=None, guide=None, visualizer=None,
+            generator=None, guide=None, visualizer=None, guide_visualizer=None,
             # keyword arguments to scheduler.step
             **kwargs
             ):
@@ -189,33 +189,15 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             # guide_original = guide.clone()
             guide = self.normalizer['action'].normalize(guide)
 
-        if guide is not None and visualizer is not None:
-            guide_markers = self.normalizer['action'].unnormalize(guide)
-            visualizer.viz_guide(guide_markers)
-
-        # if guide is not None:
-        #     # assert guide.shape == (1, 3) # guide is only 3D point
-        #     assert guide.shape[1:] == (8,) # guide is a partial trajectory
-        #     # assert guide.shape[0] < condition_data.shape[1]
-        #     assert guide.shape[0] >= self.n_obs_steps, f"guide shape: {guide.shape}, n_obs_steps: {self.n_obs_steps}"
-        #     new_global_cond = guide[:self.n_obs_steps, :].reshape(1, -1)
-        #     new_global_cond = new_global_cond.repeat(global_cond.shape[0], 1)
-        #     assert new_global_cond.shape == global_cond.shape
-        #     global_cond = new_global_cond.float()
-        #     condition_data[:, :self.n_obs_steps-1, :] = guide[1:self.n_obs_steps, :]
-
-            # start_to_goal = [((1 - t) * condition_data[:, 0, :3] + t * guide) for t in torch.linspace(0, 1, condition_data.shape[1])]
-            # start_to_goal = torch.stack(start_to_goal, dim=1) # (B, pred_horizon, 3)
-            # trajectory[:, :guide.shape[0], :] = guide
-            # condition_data[:, :guide.shape[0], :] = guide
-            # from IPython import embed; embed()
+        # if guide is not None and guide_visualizer is not None:
+        #     guide_markers = self.normalizer['action'].unnormalize(guide)
+        #     visualizer.viz_guide(guide_markers)
 
         # set step values
         scheduler.set_timesteps(self.num_inference_steps)
 
         MCMC_steps = 5
         clean_sample = None
-
         for t in scheduler.timesteps:
             for i in range(MCMC_steps):
                 # 1. apply conditioning
@@ -234,15 +216,6 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                     assert model_output.shape == grad.shape                
                     model_output = model_output + guide_ratio * grad
 
-                # # 5. visualize
-                # if visualizer is not None and guide is not None:
-                #     # action = self.normalizer['action'].unnormalize(trajectory)
-                #     # action = action.detach().cpu().numpy()
-                #     # action_marker = action.reshape(-1, 8)
-                #     visualizer.viz_traj(traj_ee=guide_marker, scores=None)  
-                #     # print('timestep:', t)
-                #     # time.sleep(0.001)
-
                 # 4. compute previous image: x_t -> x_t-1
                 scheduler_output = scheduler.step(
                         model_output, t, trajectory, 
@@ -259,6 +232,15 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 else:
                     # print('final mcmc step at t:', t)
                     trajectory = prev_sample
+
+                # # 5. visualize
+                # if visualizer is not None:
+                #     action = self.normalizer['action'].unnormalize(clean_sample)
+                #     action = action.detach().cpu().numpy()
+                #     action_marker = action.reshape(-1, 8)
+                #     visualizer.viz_traj(traj_ee=action_marker, scores=None)  
+                #     print('timestep:', t)
+                #     time.sleep(0.1)
 
         # finally make sure conditioning is enforced
         trajectory[condition_mask] = condition_data[condition_mask]        
@@ -300,7 +282,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         return grad   
 
 
-    def predict_action(self, obs_dict: Dict[str, torch.Tensor], guide=None, visualizer=None) -> Dict[str, torch.Tensor]:
+    def predict_action(self, obs_dict: Dict[str, torch.Tensor], guide=None, visualizer=None, guide_visualizer=None) -> Dict[str, torch.Tensor]:
         """
         obs_dict: must include "obs" key
         result: must include "action" key
@@ -362,6 +344,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             global_cond=global_cond,
             guide=guide,
             visualizer=visualizer,
+            guide_visualizer=guide_visualizer,
             **self.kwargs)
         
         # unnormalize prediction
