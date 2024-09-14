@@ -196,8 +196,11 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         # set step values
         scheduler.set_timesteps(self.num_inference_steps)
 
-        MCMC_steps = 5
+        MCMC_steps = 1
+        if guide is not None:
+            MCMC_steps = 5
         clean_sample = None
+        dist = None
         for t in scheduler.timesteps:
             for i in range(MCMC_steps):
                 # 1. apply conditioning
@@ -208,8 +211,8 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                     local_cond=local_cond, global_cond=global_cond)
                 
                 # 3. add interaction gradient
-                if guide is not None and clean_sample is not None: # stop adding noise as it will distract the plan
-                    grad = self.guide_gradient_by_pixel(trajectory, guide, t)
+                if guide is not None and t > 0: # stop adding noise as it will distract the plan
+                    grad, dist = self.guide_gradient_by_pixel(trajectory, guide, t)
                     # guide_ratio = 20 * 0.98**(self.num_inference_steps - t)
                     guide_ratio = 200
                     # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
@@ -246,8 +249,8 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         trajectory[condition_mask] = condition_data[condition_mask]        
         # time.sleep(1)
 
-        return trajectory
-    
+        return trajectory, dist
+
     def guide_gradient_by_pixel(self, naction, guide, t):
         # guide = torch.tensor([0.628, -0.067, 0.694]).cuda().unsqueeze(0)
         # naction: (B, pred_horizon, action_dim);
@@ -256,15 +259,14 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
         # print('guide pixel:', guide)
         # start_to_goal = [((1 - t) * naction[:, 0, :3] + t * guide) for t in torch.linspace(0, 1, naction.shape[1])]
         # start_to_goal = torch.stack(start_to_goal, dim=1) # (B, pred_horizon, 3)
-        # indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
-        # guide = torch.unsqueeze(guide[indices], dim=0) # (1, pred_horizon, guide_dim)
-
-        # assert guide.shape == (1, naction.shape[1], 3)
-        # guide = torch.unsqueeze(guide, dim=0) # (1, pred_horizon, guide_dim)
-        assert guide.shape[1:] == (8,)
-        # guide = torch.unsqueeze(guide, dim=0) # (1, guide_horizon, guide_dim)
         indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
-        guide = torch.unsqueeze(guide[indices], dim=0) # (1, guide_horizon, guide_dim)
+        guide = torch.unsqueeze(guide[indices], dim=0) # (1, pred_horizon, guide_dim)
+
+        assert guide.shape == (1, naction.shape[1], 8)
+        # assert guide.shape[1:] == (8,)
+        # guide = torch.unsqueeze(guide, dim=0) # (1, guide_horizon, guide_dim)
+        # indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
+        # guide = torch.unsqueeze(guide[indices], dim=0) # (1, guide_horizon, guide_dim)
         with torch.enable_grad():
             naction = naction.clone().detach().requires_grad_(True)
             # dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)[:, (naction.shape[1]//2):].mean(dim=1) # (B,)
@@ -279,7 +281,40 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 # dist = 0.1*dist_mean + 10*dist_min
             grad = torch.autograd.grad(dist, naction, grad_outputs=torch.ones_like(dist), create_graph=False)[0]
             # naction.detach()
-        return grad   
+        return grad, dist.clone().detach()
+
+    # def guide_gradient_by_pixel(self, naction, guide, t):
+    #     # guide = torch.tensor([0.628, -0.067, 0.694]).cuda().unsqueeze(0)
+    #     # naction: (B, pred_horizon, action_dim);
+    #     # guide: (1, guide_dim)
+    #     # assert naction.shape[2] == 8 and guide.shape == (1, 3) # guide is only 3D point
+    #     # print('guide pixel:', guide)
+    #     # start_to_goal = [((1 - t) * naction[:, 0, :3] + t * guide) for t in torch.linspace(0, 1, naction.shape[1])]
+    #     # start_to_goal = torch.stack(start_to_goal, dim=1) # (B, pred_horizon, 3)
+    #     # indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
+    #     # guide = torch.unsqueeze(guide[indices], dim=0) # (1, pred_horizon, guide_dim)
+
+    #     # assert guide.shape == (1, naction.shape[1], 3)
+    #     # guide = torch.unsqueeze(guide, dim=0) # (1, pred_horizon, guide_dim)
+    #     assert guide.shape[1:] == (8,)
+    #     # guide = torch.unsqueeze(guide, dim=0) # (1, guide_horizon, guide_dim)
+    #     indices = torch.linspace(0, guide.shape[0]-1, naction.shape[1], dtype=int)
+    #     guide = torch.unsqueeze(guide[indices], dim=0) # (1, guide_horizon, guide_dim)
+    #     with torch.enable_grad():
+    #         naction = naction.clone().detach().requires_grad_(True)
+    #         # dist = torch.linalg.norm(naction[:, :, :3] - guide, dim=2)[:, (naction.shape[1]//2):].mean(dim=1) # (B,)
+    #         # dist = torch.min(torch.linalg.norm(naction[:, :, :3] - start_to_goal, dim=2), dim=1)[0] # (B,)
+    #         dist = torch.linalg.norm(naction[:, :, :3] - guide[:, :, :3], dim=2, ord=2)**2 # (B, pred_horizon)
+    #         dist = dist.mean(dim=1) # (B,)
+    #         # dist_min = torch.min(dist, dim=1)[0] # (B,)
+    #         # print('dist:', dist_mean, dist_min)
+    #         # if t > 50:
+    #             # dist = 0.1*dist_mean
+    #         # else:
+    #             # dist = 0.1*dist_mean + 10*dist_min
+    #         grad = torch.autograd.grad(dist, naction, grad_outputs=torch.ones_like(dist), create_graph=False)[0]
+    #         # naction.detach()
+    #     return grad   
 
 
     def predict_action(self, obs_dict: Dict[str, torch.Tensor], guide=None, visualizer=None, guide_visualizer=None) -> Dict[str, torch.Tensor]:
@@ -337,7 +372,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             cond_mask[:,:To,Da:] = True
 
         # run sampling
-        nsample = self.conditional_sample(
+        nsample, dist = self.conditional_sample(
             cond_data, 
             cond_mask,
             local_cond=local_cond,
@@ -371,7 +406,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
             action_obs_pred = obs_pred[:,start:end]
             result['action_obs_pred'] = action_obs_pred
             result['obs_pred'] = obs_pred
-        return result
+        return result, dist
 
     # ========= training  ============
     def set_normalizer(self, normalizer: LinearNormalizer):
