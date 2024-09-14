@@ -214,7 +214,7 @@ class DiffusionUnetLowdimPolicy(BaseLowdimPolicy):
                 if guide is not None and t > 0: # stop adding noise as it will distract the plan
                     grad, dist = self.guide_gradient_by_pixel(trajectory, guide, t)
                     # guide_ratio = 20 * 0.98**(self.num_inference_steps - t)
-                    guide_ratio = 200
+                    guide_ratio = 300
                     # print('model_output norm and grad norm:', torch.linalg.matrix_norm(model_output).mean(), torch.linalg.matrix_norm(grad).mean())
                     assert model_output.shape == grad.shape                
                     model_output = model_output + guide_ratio * grad
